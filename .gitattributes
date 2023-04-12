@@ -1,0 +1,4 @@
+processed/embeddings_en.csv filter=lfs diff=lfs merge=lfs -text
+processed/embeddings_ko.csv filter=lfs diff=lfs merge=lfs -text
+processed/scraped_en.csv filter=lfs diff=lfs merge=lfs -text
+processed/scraped_ko.csv filter=lfs diff=lfs merge=lfs -text
