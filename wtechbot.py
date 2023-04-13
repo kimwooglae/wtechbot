@@ -1,7 +1,6 @@
 import interactions
 import json
 import openai
-import os
 import time
 
 import pandas as pd
@@ -30,7 +29,7 @@ model="gpt-3.5-turbo"
 stop_sequence=None
 
 def create_context(
-    question, df, max_len=1500, debug=False
+    question, df, max_len=1500, skip_cnt=0, debug=False
 ):
     # Get the embeddings for the question
     q_embeddings = openai.Embedding.create(input=question, engine='text-embedding-ada-002')['data'][0]['embedding']
@@ -42,6 +41,7 @@ def create_context(
     cur_len = 0
     prev_distance = 0
     prev_msg = ""
+    skip_cnt_orig = skip_cnt
 
     # Sort by distance and add the text to the context until the context is too long
     for i, row in df.sort_values('distances', ascending=True).iterrows():
@@ -51,6 +51,10 @@ def create_context(
             continue
         elif prev_msg == row['text']:
             # print("이전 목록과 동일 (문자열)")
+            continue
+        elif skip_cnt > 0:
+            # print("skip_cnt > 0")
+            skip_cnt -= 1
             continue
         else:
             prev_distance = row['distances']
@@ -69,7 +73,7 @@ def create_context(
             returns.append(row["text"])
 
     # Return the context
-    return "\n\n---\n\n".join(returns)
+    return "\n\n---\n\n".join(returns), len(returns)+skip_cnt_orig, len(returns)
 
 
 def answer_question_chat(
@@ -81,42 +85,56 @@ def answer_question_chat(
     stop_sequence=None
 ):
 
-    context = create_context(
-        question,
-        df,
-        max_len=max_len,
-        debug=debug
-    )
-    if debug:
-        print("\n\nContext:\n" + context)
-        print("\n\n")
+    gpt_retries = 3
+    gpt_retry_cnt = 0
+    skip_cnt = 0
+    while gpt_retry_cnt <= gpt_retries:
+        print("skip_cnt==>", skip_cnt)
+        context, skip_cnt_next, context_len = create_context(
+            question,
+            df,
+            max_len=max_len,
+            skip_cnt=skip_cnt,
+            debug=debug
+        )
+        if debug:
+            print("\n\nContext:\n" + context)
+            print("\n\n")
 
-    print("context==>", context)
-    retries = 3
-    retry_cnt = 0
-    backoff_time = 10
-    while retry_cnt <= retries:
-        try:
-            response = openai.ChatCompletion.create(
-                model=model,
-                messages=[
-                    {"role": "user", "content": f"Answer the question based on the context below, and if the question can't be answered based on the context, say \"잘 모르겠습니다.\"\n\nContext: {context}\n\n---\n\nQuestion: {question}\nAnswer in Korean."}
-                ],
-                temperature=0,
-                top_p=1,
-                frequency_penalty=0,
-                presence_penalty=0,
-                stop=stop_sequence,
-            )
+        print("context==>", context)
+        api_retries = 3
+        api_retry_cnt = 0
+        backoff_time = 10
+        while api_retry_cnt <= api_retries:
+            try:
+                response = openai.ChatCompletion.create(
+                    model=model,
+                    messages=[
+                        {"role": "user", "content": f"Answer the question based on the context below, and if the question can't be answered based on the context, say \"잘 모르겠습니다.\"\n\nContext: {context}\n\n---\n\nQuestion: {question}\nAnswer in Korean."}
+                    ],
+                    temperature=0,
+                    top_p=1,
+                    frequency_penalty=0,
+                    presence_penalty=0,
+                    stop=stop_sequence,
+                )
+                response_message = response["choices"][0]["message"]["content"].strip()
+                print("response_message==>", response_message)
+                print(response_message.find("잘 모르겠습니다."))
+                if response_message.find("잘 모르겠습니다.") == -1:
+                    return response_message, context, skip_cnt, context_len
+                else:
+                    gpt_retry_cnt += 1
+                    skip_cnt = skip_cnt_next
+                    break
+            except Exception as e:
+                print(e)
+                print(f"Retrying in {backoff_time} seconds...")
+                time.sleep(backoff_time)
+                backoff_time *= 1.5
+                api_retry_cnt += 1
 
-            return response["choices"][0]["message"]["content"].strip(), context
-        except Exception as e:
-            print(e)
-            print(f"Retrying in {backoff_time} seconds...")
-            time.sleep(backoff_time)
-            backoff_time *= 1.5
-            retry_cnt += 1
-        return "잘 모르겠습니다.", context
+    return "잘 모르겠습니다.", context, skip_cnt, context_len
 
 @bot.command(
     name="w",
@@ -162,15 +180,13 @@ async def w(ctx: interactions.CommandContext, question:str, model:str='gpt-3.5-t
         df = df_en
         if lang == 'ko':
             df = df_ko
-        response, context = answer_question_chat(df, question=question, model=model, debug=False)
+        response, context, skip_cnt, context_len = answer_question_chat(df, question=question, model=model, debug=False)
         print("answer==>", response)
-        # await ctx.send(("# W-Tech GPT 답변\n" + response + "\n\n# 관련 정보\n[[" + context)[:1990] + "]]")
-        # await ctx.send("# W-Tech GPT 답변\n" + response )
         total_len = len(response[:4000]) + len(question[:4000])
         embeds_len = 2
         embeds = []
         embeds.append(interactions.Embed(title="질문", description=question[:4000] ))
-        embeds.append(interactions.Embed(title="W-Tech GPT 답변", description=response[:4000] ))
+        embeds.append(interactions.Embed(title="W-Tech 답변", description=response[:4000], footer=interactions.EmbedFooter(text="powered by gpt4\tc"+ str(context_len)+ "." +str(skip_cnt)+ "") ))
         if include_context == 'Y':
             contextList = context.split("\n\n---\n\n")
             for i in range(len(contextList)):
@@ -183,10 +199,87 @@ async def w(ctx: interactions.CommandContext, question:str, model:str='gpt-3.5-t
                 embeds_len += 1
                 total_len += len(contextList[i][:4000])
 
-        # await ctx.send(embeds=embeds)
-        await ctx.send(embeds=embeds, components=interactions.Button(label="관련정보", style=interactions.ButtonStyle.LINK, url="https://docs1.inswave.com/sp5_user_guide"))
+        components = []
+        if include_context == 'N':
+            components.append(interactions.Button(label="관련정보", custom_id="wtech_gpt_context", style=interactions.ButtonStyle.PRIMARY))
+
+        if context.find("https://youtu.be") != -1:
+            components.append(interactions.Button(label="관련동영상", custom_id="wtech_gpt_youtube", style=interactions.ButtonStyle.PRIMARY))
+
+        components.append(interactions.Button(label="개발 가이드", style=interactions.ButtonStyle.LINK, url="https://docs1.inswave.com/sp5_user_guide"))
+
+        await ctx.send(embeds=embeds, components=components)
+
     except Exception as e:
         print(e)
         await ctx.send("에러가 발생했습니다.")
+
+@bot.component("wtech_gpt_context")
+async def button_response(ctx):
+    await ctx.defer()
+    print(ctx)
+    question = ctx.message.embeds[0].description
+    skip_cnt = int(ctx.message.embeds[1].footer.text.split("\t")[1].split(".")[1])
+    print("question==>", question)
+    print("skip_cnt==>", skip_cnt)
+    df = df_ko
+    context, _, _ = create_context(
+        question,
+        df,
+        max_len=3000,
+        skip_cnt=skip_cnt,
+        debug=False
+    )
+    print("context==>", context)
+    total_len = 0
+    embeds_len = 0
+    embeds = []
+    contextList = context.split("\n\n---\n\n")
+    for i in range(len(contextList)):
+        if embeds_len >= 10:
+            break
+        if total_len + len(contextList[i][:4000]) > 5800:
+            break
+
+        embeds.append(interactions.Embed(title="관련정보 - " + str((i+1)), description=contextList[i][:4000] ))
+        embeds_len += 1
+        total_len += len(contextList[i][:4000])
+
+    components = []
+
+    components.append(interactions.Button(label="개발 가이드", style=interactions.ButtonStyle.LINK, url="https://docs1.inswave.com/sp5_user_guide"))
+
+    await ctx.send(embeds=embeds, components=components)
+
+@bot.component("wtech_gpt_youtube")
+async def button_youtube_response(ctx):
+    await ctx.defer()
+    print(ctx)
+    question = ctx.message.embeds[0].description
+    skip_cnt = int(ctx.message.embeds[1].footer.text.split("\t")[1].split(".")[1])
+    print("question==>", question)
+    print("skip_cnt==>", skip_cnt)
+    df = df_ko
+    context, _, _ = create_context(
+        question,
+        df,
+        max_len=3000,
+        skip_cnt=skip_cnt,
+        debug=False
+    )
+    print("context==>", context)
+    urls = ""
+    contextList = context.split("\n\n---\n\n")
+    for i in range(len(contextList)):
+        if contextList[i].find("https://youtu.be") != -1:
+            chunks = contextList[i].split("https://youtu.be")
+            for idx in range(len(chunks)):
+                if idx > 0 and urls.find(chunks[idx].split(")")[0]) == -1:
+                    urls += "https://youtu.be" + chunks[idx].split(")")[0] + " "
+
+    components = []
+    components.append(interactions.Button(label="개발 가이드", style=interactions.ButtonStyle.LINK, url="https://docs1.inswave.com/sp5_user_guide"))
+
+    await ctx.send(content=urls, components=components)
 
 bot.start()
