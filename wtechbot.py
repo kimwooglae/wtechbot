@@ -69,7 +69,7 @@ def create_context(
             returns.append(row["text"])
 
     # Return the context
-    return "\n\n###\n\n".join(returns)
+    return "\n\n---\n\n".join(returns)
 
 
 def answer_question_chat(
@@ -119,8 +119,8 @@ def answer_question_chat(
         return "잘 모르겠습니다.", context
 
 @bot.command(
-    name="wtech",
-    description="wtech q&a bot!",
+    name="w",
+    description="W-Tech GPT 봇입니다!",
     scope=guildId,
     options = [
         interactions.Option(
@@ -143,20 +143,48 @@ def answer_question_chat(
             choices=[interactions.Choice(name="ko", value="ko"), interactions.Choice(name="en", value="en")],
             required=False,
         ),
+        interactions.Option(
+            name="include_context",
+            description="Context 정보를 반환할지여부. (기본값: N)",
+            type=interactions.OptionType.STRING,
+            choices=[interactions.Choice(name="N", value="N"), interactions.Choice(name="Y", value="Y")],
+            required=False,
+        ),
     ]
 )
-async def wtech(ctx: interactions.CommandContext, question: str, model:str='gpt-3.5-turbo', lang:str='ko'):
+async def w(ctx: interactions.CommandContext, question:str, model:str='gpt-3.5-turbo', lang:str='ko', include_context:str='N'):
     try:
         await ctx.defer()
         print("\nmodel==>", model)
         print("lang==>", lang)
         print("question==>", question)
+        print("include_context==>", include_context)
         df = df_en
         if lang == 'ko':
             df = df_ko
         response, context = answer_question_chat(df, question=question, model=model, debug=False)
         print("answer==>", response)
-        await ctx.send(("# W-Tech GPT 답변\n" + response + "\n\n# 관련 정보\n" + context)[:2000])
+        # await ctx.send(("# W-Tech GPT 답변\n" + response + "\n\n# 관련 정보\n[[" + context)[:1990] + "]]")
+        # await ctx.send("# W-Tech GPT 답변\n" + response )
+        total_len = len(response[:4000]) + len(question[:4000])
+        embeds_len = 2
+        embeds = []
+        embeds.append(interactions.Embed(title="질문", description=question[:4000] ))
+        embeds.append(interactions.Embed(title="W-Tech GPT 답변", description=response[:4000] ))
+        if include_context == 'Y':
+            contextList = context.split("\n\n---\n\n")
+            for i in range(len(contextList)):
+                if embeds_len >= 10:
+                    break
+                if total_len + len(contextList[i][:4000]) > 5800:
+                    break
+
+                embeds.append(interactions.Embed(title="관련정보 - " + str((i+1)), description=contextList[i][:4000] ))
+                embeds_len += 1
+                total_len += len(contextList[i][:4000])
+
+        # await ctx.send(embeds=embeds)
+        await ctx.send(embeds=embeds, components=interactions.Button(label="관련정보", style=interactions.ButtonStyle.LINK, url="https://docs1.inswave.com/sp5_user_guide"))
     except Exception as e:
         print(e)
         await ctx.send("에러가 발생했습니다.")
