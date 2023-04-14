@@ -203,13 +203,13 @@ def answer_question_chat(
         ),
         interactions.Option(
             name="cnt",
-            description="반환할 API 개수를 입력하세요. (기본값: 5))",
+            description="반환할 API 개수를 입력하세요. (기본값: 10))",
             type=interactions.OptionType.INTEGER,
             required=False,
         ),
     ]
 )
-async def api(ctx: interactions.CommandContext, question:str, cnt:int=5):
+async def api(ctx: interactions.CommandContext, question:str, cnt:int=10):
     try:
         await ctx.defer()
         print("\nmodel==>", model)
