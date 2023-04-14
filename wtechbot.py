@@ -17,6 +17,10 @@ df_en['embeddings'] = df_en['embeddings'].apply(eval).apply(np.array)
 
 print('english embedding loaded')
 
+df_api_ko=pd.read_csv('processed/embeddings_api_ko.csv', index_col=0)
+df_api_ko['embeddings'] = df_api_ko['embeddings'].apply(eval).apply(np.array)
+
+print('api embedding loaded')
 
 # Load configuration
 with open('config.json', 'r') as f:
@@ -72,8 +76,57 @@ def create_context(
             # Else add it to the text that is being returned
             returns.append(row["text"])
 
-    # Return the context
     return "\n\n---\n\n".join(returns), len(returns)+skip_cnt_orig, len(returns)
+
+
+def search_context(
+    df, question, max_cnt=5, debug=False
+):
+    """
+    Create a context for a question by finding the most similar context from the dataframe
+    """
+
+    # Get the embeddings for the question
+    q_embeddings = openai.Embedding.create(input=question, engine='text-embedding-ada-002')['data'][0]['embedding']
+
+    # Get the distances from the embeddings
+    df['distances'] = distances_from_embeddings(q_embeddings, df['embeddings'].values, distance_metric='cosine')
+
+    components = []
+    names = [] 
+    descriptions = []
+    cur_cnt = 0
+    prev_distance = 0
+    prev_msg = ""
+
+    # Sort by distance and add the text to the context until the context is too long
+    for i, row in df.sort_values('distances', ascending=True).iterrows():
+        
+        if prev_distance == row['distances']:
+            # print("이전 목록과 동일 (distance)")
+            continue
+        elif prev_msg == row['text']:
+            # print("이전 목록과 동일 (문자열)")
+            continue
+        else:
+            prev_distance = row['distances']
+            prev_msg = row['text']
+
+            # Add the length of the text to the current length
+            cur_cnt += 1
+
+            # If the context is too long, break
+            if cur_cnt > max_cnt:
+                break
+
+            if debug:
+                print(i, row['distances'], row['text'])
+
+            components.append(row["component"])
+            names.append(row["name"])
+            descriptions.append(row["description"])
+
+    return components, names, descriptions
 
 
 def answer_question_chat(
@@ -135,6 +188,60 @@ def answer_question_chat(
                 api_retry_cnt += 1
 
     return "잘 모르겠습니다.", context, skip_cnt, context_len
+
+
+@bot.command(
+    name="api",
+    description="API 검색용 W-Tech GPT 봇입니다!",
+    scope=guildId,
+    options = [
+        interactions.Option(
+            name="question",
+            description="질문을 입력하세요",
+            type=interactions.OptionType.STRING,
+            required=True,
+        ),
+        interactions.Option(
+            name="cnt",
+            description="반환할 API 개수를 입력하세요. (기본값: 5))",
+            type=interactions.OptionType.INTEGER,
+            required=False,
+        ),
+    ]
+)
+async def api(ctx: interactions.CommandContext, question:str, cnt:int=5):
+    try:
+        await ctx.defer()
+        print("\nmodel==>", model)
+        print("question==>", question)
+        print("cnt==>", str(cnt))
+        df = df_api_ko
+        component_name, names, descriptions = search_context(df, question=question, max_cnt=cnt, debug=True)
+        print("component_name==>", component_name)
+        print("names==>", names)
+        print("descriptions==>", descriptions)
+        total_len = len(question[:4000])
+        embeds_len = 1
+        embeds = []
+        embeds.append(interactions.Embed(title="질문", description=question[:4000] ))
+        for i in range(len(descriptions)):
+            if embeds_len >= 10:
+                break
+            if total_len + len(descriptions[i][:4000]) > 5800:
+                break
+
+            embeds.append(interactions.Embed(title=component_name[i] + " " + names[i], description=descriptions[i][:4000] ))
+            embeds_len += 1
+            total_len += len(descriptions[i][:4000])
+
+        components = []
+        components.append(interactions.Button(label="API", style=interactions.ButtonStyle.LINK, url="https://docs.inswave.com/websquare/websquare.html?w2xPath=/support/api/ws5_sp5/api.xml"))
+
+        await ctx.send(embeds=embeds, components=components)
+
+    except Exception as e:
+        print(e)
+        await ctx.send("에러가 발생했습니다.")
 
 @bot.command(
     name="w",
