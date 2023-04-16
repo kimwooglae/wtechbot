@@ -12,6 +12,11 @@ df_ko['embeddings'] = df_ko['embeddings'].apply(eval).apply(np.array)
 
 print('korean embedding loaded')
 
+df_ko_cleansing=pd.read_csv('processed/embeddings_cleaning_ko.csv', index_col=0)
+df_ko_cleansing['embeddings'] = df_ko_cleansing['embeddings'].apply(eval).apply(np.array)
+
+print('korean cleaning embedding loaded')
+
 df_en=pd.read_csv('processed/embeddings_en.csv', index_col=0)
 df_en['embeddings'] = df_en['embeddings'].apply(eval).apply(np.array)
 
@@ -262,10 +267,10 @@ async def api(ctx: interactions.CommandContext, question:str, cnt:int=10):
             required=False,
         ),
         interactions.Option(
-            name="lang",
-            description="한국어 데이터를 사용할지, 영어 데이터를 사용할지 선택하세요. (기본값: ko)",
+            name="data",
+            description="어떤 데이터를 사용할지 선택하세요. (ko:한국어 원본 데이터, ko_cleaning:한국어 cleaning 데이터, en: 영어 데이터) (기본값: ko_cleaning)",
             type=interactions.OptionType.STRING,
-            choices=[interactions.Choice(name="ko", value="ko"), interactions.Choice(name="en", value="en")],
+            choices=[interactions.Choice(name="ko", value="ko"), interactions.Choice(name="ko_cleaning", value="ko_cleaning"), interactions.Choice(name="en", value="en")],
             required=False,
         ),
         interactions.Option(
@@ -277,16 +282,18 @@ async def api(ctx: interactions.CommandContext, question:str, cnt:int=10):
         ),
     ]
 )
-async def w(ctx: interactions.CommandContext, question:str, model:str='gpt-3.5-turbo', lang:str='ko', include_context:str='N'):
+async def w(ctx: interactions.CommandContext, question:str, model:str='gpt-3.5-turbo', data:str='ko_cleansing', include_context:str='N'):
     try:
         await ctx.defer()
         print("\nmodel==>", model)
-        print("lang==>", lang)
+        print("data==>", data)
         print("question==>", question)
         print("include_context==>", include_context)
         df = df_en
-        if lang == 'ko':
+        if data == 'ko':
             df = df_ko
+        elif data == 'ko_cleansing':
+            df = df_ko_cleansing
         response, context, skip_cnt, context_len = answer_question_chat(df, question=question, model=model, debug=False)
         print("answer==>", response)
         total_len = len(response[:4000]) + len(question[:4000])
