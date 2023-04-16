@@ -289,10 +289,13 @@ async def w(ctx: interactions.CommandContext, question:str, model:str='gpt-3.5-t
         print("data==>", data)
         print("question==>", question)
         print("include_context==>", include_context)
+        data_type = '2'
         df = df_en
         if data == 'ko':
+            data_type = '0'
             df = df_ko
         elif data == 'ko_cleansing':
+            data_type = '1'
             df = df_ko_cleansing
         response, context, skip_cnt, context_len = answer_question_chat(df, question=question, model=model, debug=False)
         print("answer==>", response)
@@ -300,7 +303,7 @@ async def w(ctx: interactions.CommandContext, question:str, model:str='gpt-3.5-t
         embeds_len = 2
         embeds = []
         embeds.append(interactions.Embed(title="질문", description=question[:4000] ))
-        embeds.append(interactions.Embed(title="W-Tech 답변", description=response[:4000], footer=interactions.EmbedFooter(text="powered by gpt4\tc"+ str(context_len)+ "." +str(skip_cnt)+ "") ))
+        embeds.append(interactions.Embed(title="W-Tech 답변", description=response[:4000], footer=interactions.EmbedFooter(text="powered by gpt4\tc"+ str(context_len)+ "." +str(skip_cnt)+ "." + data_type + "") ))
         if include_context == 'Y':
             contextList = context.split("\n\n---\n\n")
             for i in range(len(contextList)):
@@ -329,14 +332,22 @@ async def w(ctx: interactions.CommandContext, question:str, model:str='gpt-3.5-t
         await ctx.send("에러가 발생했습니다.")
 
 @bot.component("wtech_gpt_context")
-async def button_response(ctx):
+async def button_response_detail(ctx):
     await ctx.defer()
     print(ctx)
     question = ctx.message.embeds[0].description
     skip_cnt = int(ctx.message.embeds[1].footer.text.split("\t")[1].split(".")[1])
+    data_type = int(ctx.message.embeds[1].footer.text.split("\t")[1].split(".")[2])
     print("question==>", question)
     print("skip_cnt==>", skip_cnt)
     df = df_ko
+    if data_type == 0:
+        df = df_ko
+    elif data_type == 1:
+        df = df_ko_cleansing
+    else:
+        df = df_en
+
     context, _, _ = create_context(
         question,
         df,
