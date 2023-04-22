@@ -296,7 +296,7 @@ def api():
 def w():
     responseBody = {
         "version": "2.0",
-        "useCallback": true,
+        "useCallback": True,
         "template": {"outputs": [{"simpleText": {"text": ""}}]},
     }
     try:
