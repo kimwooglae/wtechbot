@@ -200,7 +200,7 @@ def search_context(df, question, max_cnt=5, debug=False):
 
             components.append(row["component"])
             names.append(row["name"])
-            descriptions.append(row["description"])
+            descriptions.append(cleanhtml(row["description"]))
 
     return components, names, descriptions
 

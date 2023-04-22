@@ -10,6 +10,16 @@ import numpy as np
 from openai.embeddings_utils import distances_from_embeddings
 
 from flask import Flask, request
+import re
+
+# CLEANR = re.compile('<.*?>')
+CLEANR = re.compile("<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});")
+
+
+def cleanhtml(raw_html):
+    cleantext = re.sub(CLEANR, "", raw_html)
+    return cleantext
+
 
 app = Flask(__name__)
 
@@ -134,7 +144,7 @@ def search_context(df, question, max_cnt=5, debug=False):
 
             components.append(row["component"])
             names.append(row["name"])
-            descriptions.append(row["description"])
+            descriptions.append(cleanhtml(row["description"]))
 
     return components, names, descriptions
 
