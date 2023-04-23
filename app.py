@@ -41,6 +41,9 @@ print("korean embedding loaded")
 # print("english embedding loaded")
 
 df_api_ko = pd.read_csv("processed/embeddings_api_ko.csv", index_col=0)
+df_api_ko.drop(
+    df_api_ko[df_api_ko["component"] == "WebSquare.uiplugin.grid"].index, inplace=True
+)
 df_api_ko["embeddings"] = df_api_ko["embeddings"].apply(eval).apply(np.array)
 
 print("api embedding loaded")
