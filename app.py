@@ -1,6 +1,7 @@
 import os
-
+import threading
 import json
+import requests
 import openai
 import time
 
@@ -314,17 +315,19 @@ def w():
     }
     try:
         body = request.get_json()
-        print(body)
-        print(body["userRequest"]["utterance"])
-        question = body["action"]["detailParams"]["question"]["value"]
-        data = "ko"
-        include_context = "N"
+        timer = threading.Timer(1.0, w_callback, args=(body,))
+        timer.start()
+        # print(body)
+        # print(body["userRequest"]["utterance"])
+        # question = body["action"]["detailParams"]["question"]["value"]
+        # data = "ko"
+        # include_context = "N"
 
-        print("\nmodel==>", model)
-        print("data==>", data)
-        print("question==>", question)
-        print("include_context==>", include_context)
-        df = df_ko
+        # print("\nmodel==>", model)
+        # print("data==>", data)
+        # print("question==>", question)
+        # print("include_context==>", include_context)
+        # df = df_ko
         # data_type = "0"
         # if data == "ko":
         #     data_type = "0"
@@ -336,14 +339,64 @@ def w():
         #     data_type = "2"
         #     df = df_en
 
+        # response, context, skip_cnt, context_len, context2 = answer_question_chat(
+        #     df, question=question, model=model, debug=False, df2=df_ko
+        # )
+        # print("answer==>", response)
+        # msg = (response[:997] + "..") if len(response) > 997 else response
+        # responseBody["template"]["outputs"][0]["simpleText"]["text"] = msg
+        responseBody["useCallback"] = True
+    except Exception as e:
+        print(e)
+        responseBody["template"]["outputs"][0]["simpleText"]["text"] = "에러가 발생했습니다."
+    return responseBody
+
+
+def w_callback(body):
+    requestBody = {
+        "version": "2.0",
+        "useCallback": True,
+        "template": {"outputs": [{"simpleText": {"text": ""}}]},
+    }
+    try:
+        print(body)
+        print(body["userRequest"]["utterance"])
+        question = body["action"]["detailParams"]["question"]["value"]
+        callbackUrl = body["userRequest"]["callbackUrl"]
+        data = "ko"
+        include_context = "N"
+
+        print("\nmodel==>", model)
+        print("data==>", data)
+        print("question==>", question)
+        print("include_context==>", include_context)
+        df = df_ko
+        data_type = "0"
+        if data == "ko":
+            data_type = "0"
+            df = df_ko
+        elif data == "ko_cleansing":
+            data_type = "1"
+            df = df_ko_cleansing
+        else:
+            data_type = "2"
+            df = df_en
+
         response, context, skip_cnt, context_len, context2 = answer_question_chat(
             df, question=question, model=model, debug=False, df2=df_ko
         )
         print("answer==>", response)
         msg = (response[:997] + "..") if len(response) > 997 else response
-        responseBody["template"]["outputs"][0]["simpleText"]["text"] = msg
+        requestBody["template"]["outputs"][0]["simpleText"]["text"] = msg
+        headers = {"Content-Type": "application/json; charset=utf-8"}
+        print("callbackUrl==>", callbackUrl)
+        print("headers==>", headers)
+        print("requestBody==>", requestBody)
+        res = requests.post(callbackUrl, data=json.dumps(requestBody), headers=headers)
+        print(res)
 
+        print("\n\n\n")
     except Exception as e:
         print(e)
         responseBody["template"]["outputs"][0]["simpleText"]["text"] = "에러가 발생했습니다."
-    return responseBody
+    # return responseBody
