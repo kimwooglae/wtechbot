@@ -362,7 +362,7 @@ async def api(ctx: interactions.CommandContext, question: str, cnt: int = 10):
         ),
         interactions.Option(
             name="data",
-            description="어떤 데이터를 사용할지 선택하세요. (ko:한국어 원본 데이터, ko_cleaning:한국어 cleaning 데이터, en: 영어 데이터) (기본값: ko_cleaning)",
+            description="어떤 데이터를 사용할지 선택하세요. (ko:한국어 원본 데이터, ko_cleaning:한국어 cleaning 데이터, en: 영어 데이터) (기본값: ko)",
             type=interactions.OptionType.STRING,
             choices=[
                 interactions.Choice(name="ko", value="ko"),
@@ -387,7 +387,7 @@ async def w(
     ctx: interactions.CommandContext,
     question: str,
     model: str = "gpt-3.5-turbo",
-    data: str = "ko_cleansing",
+    data: str = "ko",
     include_context: str = "N",
 ):
     try:
@@ -396,14 +396,14 @@ async def w(
         print("data==>", data)
         print("question==>", question)
         print("include_context==>", include_context)
-        data_type = "2"
         df = df_en
         if data == "ko":
-            data_type = "0"
             df = df_ko
         elif data == "ko_cleansing":
-            data_type = "1"
             df = df_ko_cleansing
+        else:
+            df = df_en
+
         response, context, skip_cnt, context_len, context2 = answer_question_chat(
             df, question=question, model=model, debug=False, df2=df_ko
         )
@@ -422,7 +422,7 @@ async def w(
                     + "."
                     + str(skip_cnt)
                     + "."
-                    + data_type
+                    + data
                     + ""
                 ),
             )
@@ -472,7 +472,7 @@ async def w(
 
         components.append(
             interactions.Button(
-                label="개발 가이드",
+                label="가이드",
                 style=interactions.ButtonStyle.LINK,
                 url="https://docs1.inswave.com/sp5_user_guide",
             )
@@ -490,13 +490,13 @@ async def button_response_detail(ctx):
     print(ctx)
     question = ctx.message.embeds[0].description
     skip_cnt = int(ctx.message.embeds[1].footer.text.split("\t")[1].split(".")[1])
-    data_type = int(ctx.message.embeds[1].footer.text.split("\t")[1].split(".")[2])
+    data = ctx.message.embeds[1].footer.text.split("\t")[1].split(".")[2]
     print("question==>", question)
     print("skip_cnt==>", skip_cnt)
-    df = df_ko
-    if data_type == 0:
+    df = df_en
+    if data == "ko":
         df = df_ko
-    elif data_type == 1:
+    elif data == "ko_cleansing":
         df = df_ko_cleansing
     else:
         df = df_en

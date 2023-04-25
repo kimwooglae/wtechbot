@@ -274,7 +274,7 @@ def api():
                 break
 
             if i > 0:
-                msg += "\n"
+                msg += "\n\n"
 
             info = (
                 (descriptions[i][:97] + "..")
@@ -283,16 +283,18 @@ def api():
             )
             msg = (
                 msg
-                + str(int(i + 1))
-                + "\ufe0f\u20e3 "
+                # + str(int(i + 1))
+                # + "\ufe0f\u20e3 "
+                # + "■ "
+                + "["
                 + component_name[i].rsplit(".", 1)[-1]
                 + "."
                 + names[i]
-                + " "
+                + "]\n"
                 + info
             )
             total_len += (
-                4
+                6
                 + len(component_name[i].rsplit(".", 1)[-1])
                 + len(names[i])
                 + len(info)
