@@ -213,7 +213,7 @@ def search_context(df, question, max_cnt=5, debug=False):
     return components, names, descriptions
 
 
-def answer_question_chat(
+def question_answer(
     df,
     model="gpt-3.5-turbo",
     question="",
@@ -277,34 +277,13 @@ def answer_question_chat(
     return "잘 모르겠습니다.", context, skip_cnt, context_len, context2
 
 
-@bot.command(
-    name="api",
-    description="API 검색용 W-Tech GPT 봇입니다!",
-    scope=guildId,
-    options=[
-        interactions.Option(
-            name="question",
-            description="질문을 입력하세요",
-            type=interactions.OptionType.STRING,
-            required=True,
-        ),
-        interactions.Option(
-            name="cnt",
-            description="반환할 API 개수를 입력하세요. (기본값: 10))",
-            type=interactions.OptionType.INTEGER,
-            required=False,
-        ),
-    ],
-)
-async def api(ctx: interactions.CommandContext, question: str, cnt: int = 10):
+def search_content_bot(df, question, cnt, debug):
     try:
-        await ctx.defer()
-        print("\nmodel==>", model)
+        print("\napi 검색 질문")
         print("question==>", question)
         print("cnt==>", str(cnt))
-        df = df_api_ko
         component_name, names, descriptions = search_context(
-            df, question=question, max_cnt=cnt, debug=True
+            df, question=question, max_cnt=cnt, debug=debug
         )
         print("component_name==>", component_name)
         print("names==>", names)
@@ -337,11 +316,131 @@ async def api(ctx: interactions.CommandContext, question: str, cnt: int = 10):
             )
         )
 
-        await ctx.send(embeds=embeds, components=components)
+        return embeds, components, ""
 
     except Exception as e:
         print(e)
-        await ctx.send("에러가 발생했습니다.")
+        return [], [], "에러가 발생했습니다."
+
+
+def question_answer_bot(question, model, data, debug=False, max_len=3000):
+    try:
+        df = df_en
+        if data == "ko":
+            df = df_ko
+        elif data == "ko_cleansing":
+            df = df_ko_cleansing
+        else:
+            df = df_en
+
+        print("\n웹스퀘어 질문")
+        print("question==>", question)
+        print("model==>", model)
+        print("data==>", data)
+
+        response, context, skip_cnt, context_len, context2 = question_answer(
+            df,
+            question=question,
+            model=model,
+            debug=debug,
+            df2=df_ko,
+            max_len=max_len,
+        )
+        print("answer==>", response)
+        total_len = len(response[:4000]) + len(question[:4000])
+        embeds_len = 2
+        embeds = []
+        embeds.append(interactions.Embed(title="질문", description=question[:4000]))
+        embeds.append(
+            interactions.Embed(
+                title="W-Tech 답변",
+                description=response[:4000],
+                footer=interactions.EmbedFooter(
+                    text="powered by gpt4\tc"
+                    + str(context_len)
+                    + "."
+                    + str(skip_cnt)
+                    + "."
+                    + data
+                    + ""
+                ),
+            )
+        )
+        components = []
+        components.append(
+            interactions.Button(
+                label="관련정보",
+                custom_id="wtech_gpt_context",
+                style=interactions.ButtonStyle.PRIMARY,
+            )
+        )
+
+        components.append(
+            interactions.Button(
+                label="API",
+                custom_id="wtech_gpt_api",
+                style=interactions.ButtonStyle.PRIMARY,
+            )
+        )
+
+        components.append(
+            interactions.Button(
+                label="동영상",
+                custom_id="wtech_gpt_youtube",
+                style=interactions.ButtonStyle.PRIMARY,
+            )
+        )
+
+        components.append(
+            interactions.Button(
+                label="가이드",
+                custom_id="wtech_gpt_guide",
+                style=interactions.ButtonStyle.PRIMARY,
+            )
+        )
+
+        components.append(
+            interactions.Button(
+                label="가이드",
+                style=interactions.ButtonStyle.LINK,
+                url="https://docs1.inswave.com/sp5_user_guide",
+            )
+        )
+        return embeds, components, ""
+
+    except Exception as e:
+        print(e)
+        return [], [], "에러가 발생했습니다."
+
+
+@bot.command(
+    name="api",
+    description="API 검색용 W-Tech GPT 봇입니다!",
+    scope=guildId,
+    options=[
+        interactions.Option(
+            name="question",
+            description="질문을 입력하세요",
+            type=interactions.OptionType.STRING,
+            required=True,
+        ),
+        interactions.Option(
+            name="cnt",
+            description="반환할 API 개수를 입력하세요. (기본값: 10))",
+            type=interactions.OptionType.INTEGER,
+            required=False,
+        ),
+    ],
+)
+async def api(ctx: interactions.CommandContext, question: str, cnt: int = 10):
+    await ctx.defer()
+    embeds, components, msg = search_content_bot(
+        question=question, cnt=cnt, df=df_api_ko, debug=False
+    )
+    if msg != "":
+        await ctx.send(msg)
+    else:
+        await ctx.send(embeds=embeds, components=components)
 
 
 @bot.command(
@@ -376,16 +475,6 @@ async def api(ctx: interactions.CommandContext, question: str, cnt: int = 10):
             ],
             required=False,
         ),
-        interactions.Option(
-            name="include_context",
-            description="Context 정보를 반환할지여부. (기본값: N)",
-            type=interactions.OptionType.STRING,
-            choices=[
-                interactions.Choice(name="N", value="N"),
-                interactions.Choice(name="Y", value="Y"),
-            ],
-            required=False,
-        ),
     ],
 )
 async def w(
@@ -393,104 +482,24 @@ async def w(
     question: str,
     model: str = "gpt-3.5-turbo",
     data: str = "ko",
-    include_context: str = "N",
 ):
-    try:
-        await ctx.defer()
-        print("\nmodel==>", model)
-        print("data==>", data)
-        print("question==>", question)
-        print("include_context==>", include_context)
-        df = df_en
-        if data == "ko":
-            df = df_ko
-        elif data == "ko_cleansing":
-            df = df_ko_cleansing
-        else:
-            df = df_en
-
+    await ctx.defer()
+    if model == "gpt-3.5-turbo":
         max_len = 3000
-        if model == "gpt-4":
-            max_len = 6000
+    else:
+        max_len = 6000
 
-        response, context, skip_cnt, context_len, context2 = answer_question_chat(
-            df, question=question, model=model, debug=False, df2=df_ko, max_len=max_len
-        )
-        print("answer==>", response)
-        total_len = len(response[:4000]) + len(question[:4000])
-        embeds_len = 2
-        embeds = []
-        embeds.append(interactions.Embed(title="질문", description=question[:4000]))
-        embeds.append(
-            interactions.Embed(
-                title="W-Tech 답변",
-                description=response[:4000],
-                footer=interactions.EmbedFooter(
-                    text="powered by gpt4\tc"
-                    + str(context_len)
-                    + "."
-                    + str(skip_cnt)
-                    + "."
-                    + data
-                    + ""
-                ),
-            )
-        )
-        if include_context == "Y":
-            contextList = context.split("\n\n---\n\n")
-            for i in range(len(contextList)):
-                if embeds_len >= 10:
-                    break
-                if total_len + len(contextList[i][:4000]) > 5800:
-                    break
-
-                embeds.append(
-                    interactions.Embed(
-                        title="관련정보 - " + str((i + 1)),
-                        description=contextList[i][:4000],
-                    )
-                )
-                embeds_len += 1
-                total_len += len(contextList[i][:4000])
-
-        components = []
-        if include_context == "N":
-            components.append(
-                interactions.Button(
-                    label="관련정보",
-                    custom_id="wtech_gpt_context",
-                    style=interactions.ButtonStyle.PRIMARY,
-                )
-            )
-
-        components.append(
-            interactions.Button(
-                label="동영상",
-                custom_id="wtech_gpt_youtube",
-                style=interactions.ButtonStyle.PRIMARY,
-            )
-        )
-
-        components.append(
-            interactions.Button(
-                label="가이드",
-                custom_id="wtech_gpt_guide",
-                style=interactions.ButtonStyle.PRIMARY,
-            )
-        )
-
-        components.append(
-            interactions.Button(
-                label="가이드",
-                style=interactions.ButtonStyle.LINK,
-                url="https://docs1.inswave.com/sp5_user_guide",
-            )
-        )
+    embeds, components, msg = question_answer_bot(
+        question=question,
+        model=model,
+        data=data,
+        max_len=max_len,
+        debug=False,
+    )
+    if msg != "":
+        await ctx.send(content=msg)
+    else:
         await ctx.send(embeds=embeds, components=components)
-
-    except Exception as e:
-        print(e)
-        await ctx.send("에러가 발생했습니다.")
 
 
 @bot.component("wtech_gpt_context")
@@ -545,10 +554,23 @@ async def button_response_detail(ctx):
     await ctx.send(embeds=embeds, components=components)
 
 
+@bot.component("wtech_gpt_api")
+async def button_api_detail(ctx):
+    await ctx.defer()
+    question = ctx.message.embeds[0].description
+    embeds, components, msg = search_content_bot(
+        question=question, cnt=10, df=df_api_ko, debug=False
+    )
+    if msg != "":
+        await ctx.send(content=msg)
+    else:
+        await ctx.send(embeds=embeds, components=components)
+
+
 @bot.component("wtech_gpt_guide")
 async def button_guide_detail(ctx):
     await ctx.defer()
-    print(ctx)
+    # print(ctx)
     question = ctx.message.embeds[0].description
     skip_cnt = 0
     # skip_cnt = int(ctx.message.embeds[1].footer.text.split("\t")[1].split(".")[1])
@@ -638,122 +660,43 @@ async def button_youtube_response(ctx):
 async def on_message_create(message):
     if message.guild_id != guildId:
         return
-    mention = False
-    for x in message.mentions:
-        if x["id"] == clientId:
-            mention = True
-            break
-    if mention == False:
+    if message.author.bot == True:
+        return
+    if message.content == "":
         return
 
-    print("on_message_create")
+    print("on_message_create", message)
     clean_text = re.sub(r"<@\d+>", "", message.content)
-    # clean_text = re.sub(r"<@\d{20}>", "", message.content)
-    trim_text = clean_text.strip()
-    print("trim_text", trim_text)
+    question = clean_text.strip()
 
-    if trim_text == "ping":
-        print("ping")
-        await message.reply(content="pong")
-        return
-
-    try:
-        question = trim_text
-        include_context = False
-        data = "ko"
-        model = "gpt-4"
-        max_len = 6000
-        df = df_en
-        if data == "ko":
-            df = df_ko
-        elif data == "ko_cleansing":
-            df = df_ko_cleansing
+    if message.channel_id == "1101713458459848774":  # api질문
+        embeds, components, msg = search_content_bot(
+            question=question, cnt=10, df=df_api_ko, debug=False
+        )
+        if msg != "":
+            await message.reply(content=msg)
         else:
-            df = df_en
+            await message.reply(embeds=embeds, components=components)
+    else:
+        mention = False
+        for x in message.mentions:
+            if x["id"] == clientId:
+                mention = True
+                break
+        if mention == False:
+            return
 
-        print("\nmodel==>", model)
-        print("data==>", data)
-        print("question==>", question)
-        print("include_context==>", include_context)
-
-        response, context, skip_cnt, context_len, context2 = answer_question_chat(
-            df, question=question, model=model, debug=False, df2=df_ko, max_len=max_len
+        embeds, components, msg = question_answer_bot(
+            question=question,
+            model="gpt-4",
+            data="ko",
+            max_len=6000,
+            debug=False,
         )
-        print("answer==>", response)
-        total_len = len(response[:4000]) + len(question[:4000])
-        embeds_len = 2
-        embeds = []
-        embeds.append(interactions.Embed(title="질문", description=question[:4000]))
-        embeds.append(
-            interactions.Embed(
-                title="W-Tech 답변",
-                description=response[:4000],
-                footer=interactions.EmbedFooter(
-                    text="powered by gpt4\tc"
-                    + str(context_len)
-                    + "."
-                    + str(skip_cnt)
-                    + "."
-                    + data
-                    + ""
-                ),
-            )
-        )
-        if include_context == "Y":
-            contextList = context.split("\n\n---\n\n")
-            for i in range(len(contextList)):
-                if embeds_len >= 10:
-                    break
-                if total_len + len(contextList[i][:4000]) > 5800:
-                    break
-
-                embeds.append(
-                    interactions.Embed(
-                        title="관련정보 - " + str((i + 1)),
-                        description=contextList[i][:4000],
-                    )
-                )
-                embeds_len += 1
-                total_len += len(contextList[i][:4000])
-
-        components = []
-        if include_context == "N":
-            components.append(
-                interactions.Button(
-                    label="관련정보",
-                    custom_id="wtech_gpt_context",
-                    style=interactions.ButtonStyle.PRIMARY,
-                )
-            )
-
-        components.append(
-            interactions.Button(
-                label="동영상",
-                custom_id="wtech_gpt_youtube",
-                style=interactions.ButtonStyle.PRIMARY,
-            )
-        )
-
-        components.append(
-            interactions.Button(
-                label="가이드",
-                custom_id="wtech_gpt_guide",
-                style=interactions.ButtonStyle.PRIMARY,
-            )
-        )
-
-        components.append(
-            interactions.Button(
-                label="가이드",
-                style=interactions.ButtonStyle.LINK,
-                url="https://docs1.inswave.com/sp5_user_guide",
-            )
-        )
-        await message.reply(embeds=embeds, components=components)
-
-    except Exception as e:
-        print(e)
-        await message.reply("에러가 발생했습니다.")
+        if msg != "":
+            await message.reply(content=msg)
+        else:
+            await message.reply(embeds=embeds, components=components)
 
 
 bot.start()
