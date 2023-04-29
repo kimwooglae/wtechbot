@@ -50,7 +50,7 @@ df_api_ko["embeddings"] = df_api_ko["embeddings"].apply(eval).apply(np.array)
 print("api embedding loaded")
 
 
-model = "gpt-3.5-turbo"
+model = "gpt-4"
 stop_sequence = None
 
 
@@ -334,6 +334,7 @@ def w_callback(body):
         question = body["action"]["detailParams"]["question"]["value"]
         callbackUrl = body["userRequest"]["callbackUrl"]
         data = "ko"
+        max_len = 6000
         include_context = "N"
 
         print("\nmodel==>", model)
@@ -353,7 +354,7 @@ def w_callback(body):
         #     df = df_en
 
         response, context, skip_cnt, context_len, context2 = answer_question_chat(
-            df, question=question, model=model, debug=False, df2=df_ko
+            df, question=question, model=model, debug=False, df2=df_ko, max_len=max_len
         )
         print("answer==>", response)
         msg = (response[:997] + "..") if len(response) > 997 else response

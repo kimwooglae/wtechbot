@@ -409,8 +409,12 @@ async def w(
         else:
             df = df_en
 
+        max_len = 3000
+        if model == "gpt-4":
+            max_len = 6000
+
         response, context, skip_cnt, context_len, context2 = answer_question_chat(
-            df, question=question, model=model, debug=False, df2=df_ko
+            df, question=question, model=model, debug=False, df2=df_ko, max_len=max_len
         )
         print("answer==>", response)
         total_len = len(response[:4000]) + len(question[:4000])
@@ -657,7 +661,8 @@ async def on_message_create(message):
         question = trim_text
         include_context = False
         data = "ko"
-        model = "gpt-3.5-turbo"
+        model = "gpt-4"
+        max_len = 6000
         df = df_en
         if data == "ko":
             df = df_ko
@@ -672,7 +677,7 @@ async def on_message_create(message):
         print("include_context==>", include_context)
 
         response, context, skip_cnt, context_len, context2 = answer_question_chat(
-            df, question=question, model=model, debug=False, df2=df_ko
+            df, question=question, model=model, debug=False, df2=df_ko, max_len=max_len
         )
         print("answer==>", response)
         total_len = len(response[:4000]) + len(question[:4000])
