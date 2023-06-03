@@ -4,6 +4,7 @@ import json
 import requests
 import openai
 import time
+from datetime import datetime
 
 import pandas as pd
 import numpy as np
@@ -24,7 +25,7 @@ def cleanhtml(raw_html):
 
 
 app = Flask(__name__)
-CORS(app, origins=[f"https://41ec6e2ada58.ngrok.app", "https://chat.openai.com"])
+CORS(app, origins=[f"https://8a37936d4ae9.ngrok.app", "https://chat.openai.com"])
 
 df_ko = pd.read_csv("processed/embeddings_ko.csv", index_col=0)
 df_ko["embeddings"] = df_ko["embeddings"].apply(eval).apply(np.array)
@@ -180,7 +181,10 @@ def answer_question_chat(
             print("\n\nContext:\n" + context)
             print("\n\n")
 
-        print("context==>", context)
+        print(
+            "[" + datetime.today().strftime("%Y-%m-%d %H:%M:%S") + "] " + "context==>",
+            context,
+        )
         api_retries = 3
         api_retry_cnt = 0
         backoff_time = 10
@@ -201,8 +205,13 @@ def answer_question_chat(
                     stop=stop_sequence,
                 )
                 response_message = response["choices"][0]["message"]["content"].strip()
-                print("response_message==>", response_message)
-                print(response_message.find("잘 모르겠습니다."))
+                print(
+                    "["
+                    + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+                    + "] "
+                    + "response_message==>",
+                    response_message,
+                )
                 if response_message.find("잘 모르겠습니다.") == -1:
                     return response_message, context, skip_cnt, context_len, context2
                 else:
@@ -248,13 +257,31 @@ def openapi_query():
         print(body["query"])
         question = body["query"]
         max_len = 4000
-        print("question==>", question)
-        print("max_len==>", max_len)
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] "
+            + "/query question==>",
+            question,
+        )
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] "
+            + "/query max_len==>",
+            max_len,
+        )
         df = df_ko
         context, _, _ = create_context(
             question, df, max_len=max_len, skip_cnt=0, debug=False
         )
-        print("context==>", context)
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] "
+            + "/query context==>",
+            context,
+        )
 
         responseBody["results"] = context
 
@@ -289,16 +316,52 @@ def api():
         print(body["userRequest"]["utterance"])
         question = body["action"]["detailParams"]["question"]["value"]
         cnt = 10
-        print("\nmodel==>", model)
-        print("question==>", question)
-        print("cnt==>", cnt)
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] "
+            + "/api/api model==>",
+            model,
+        )
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] "
+            + "/api/api question==>",
+            question,
+        )
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] "
+            + "/api/api cnt==>",
+            cnt,
+        )
         df = df_api_ko
         component_name, names, descriptions = search_context(
             df, question=question, max_cnt=cnt, debug=True
         )
-        print("component_name==>", component_name)
-        print("names==>", names)
-        print("descriptions==>", descriptions)
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] "
+            + "/api/api component_name==>",
+            component_name,
+        )
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] "
+            + "/api/api names==>",
+            names,
+        )
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] "
+            + "/api/api descriptions==>",
+            descriptions,
+        )
 
         total_len = 0
         msg = ""
@@ -371,18 +434,47 @@ def w_callback(body):
         "template": {"outputs": [{"simpleText": {"text": ""}}]},
     }
     try:
-        print(body)
-        print(body["userRequest"]["utterance"])
+        print("[" + datetime.today().strftime("%Y-%m-%d %H:%M:%S") + "] /api/w " + body)
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] /api/w "
+            + body["userRequest"]["utterance"]
+        )
         question = body["action"]["detailParams"]["question"]["value"]
         callbackUrl = body["userRequest"]["callbackUrl"]
         data = "ko"
         max_len = 6000
         include_context = "N"
 
-        print("\nmodel==>", model)
-        print("data==>", data)
-        print("question==>", question)
-        print("include_context==>", include_context)
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] /api/w"
+            + " model==>",
+            model,
+        )
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] /api/w"
+            + " data==>",
+            data,
+        )
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] /api/w"
+            + " question==>",
+            question,
+        )
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] /api/w"
+            + " include_context==>",
+            include_context,
+        )
         df = df_ko
         # data_type = "0"
         # if data == "ko":
@@ -398,15 +490,39 @@ def w_callback(body):
         response, context, skip_cnt, context_len, context2 = answer_question_chat(
             df, question=question, model=model, debug=False, df2=df_ko, max_len=max_len
         )
-        print("answer==>", response)
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] /api/w"
+            + " answer==>",
+            response,
+        )
         msg = (response[:997] + "..") if len(response) > 997 else response
         requestBody["template"]["outputs"][0]["simpleText"]["text"] = msg
         headers = {"Content-Type": "application/json; charset=utf-8"}
-        print("callbackUrl==>", callbackUrl)
-        print("headers==>", headers)
-        print("requestBody==>", requestBody)
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] /api/w"
+            + " callbackUrl==>",
+            callbackUrl,
+        )
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] /api/w"
+            + " headers==>",
+            headers,
+        )
+        print(
+            "["
+            + datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+            + "] /api/w"
+            + " requestBody==>",
+            requestBody,
+        )
         res = requests.post(callbackUrl, data=json.dumps(requestBody), headers=headers)
-        print(res)
+        print("[" + datetime.today().strftime("%Y-%m-%d %H:%M:%S") + "] /api/w " + res)
 
         print("\n\n\n")
     except Exception as e:

@@ -9,9 +9,9 @@
     },
     "api": {
         "type": "openapi",
-        "url": "https://41ec6e2ada58.ngrok.app/openapi.yaml"
+        "url": "https://8a37936d4ae9.ngrok.app/openapi.yaml"
     },
-    "logo_url": "https://41ec6e2ada58.ngrok.app/logo.png",
+    "logo_url": "https://8a37936d4ae9.ngrok.app/logo.png",
     "contact_email": "webmaster@inswave.com",
     "legal_info_url": "https://www.inswave.com/websquare/websquare.html?w2xPath=/company/privacypolicy.xml"
 }

@@ -4,7 +4,7 @@ info:
   description: A retrieval API for querying and filtering WebSquare documents based on natural language queries and metadata.
   version: 1.0.0
 servers:
-  - url: https://41ec6e2ada58.ngrok.app
+  - url: https://8a37936d4ae9.ngrok.app
 paths:
   /query:
     post:
