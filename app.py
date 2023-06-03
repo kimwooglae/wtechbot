@@ -10,7 +10,8 @@ import numpy as np
 
 from openai.embeddings_utils import distances_from_embeddings
 
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
+from flask_cors import CORS
 import re
 
 # CLEANR = re.compile('<.*?>')
@@ -23,6 +24,7 @@ def cleanhtml(raw_html):
 
 
 app = Flask(__name__)
+CORS(app, origins=[f"https://41ec6e2ada58.ngrok.app", "https://chat.openai.com"])
 
 df_ko = pd.read_csv("processed/embeddings_ko.csv", index_col=0)
 df_ko["embeddings"] = df_ko["embeddings"].apply(eval).apply(np.array)
@@ -220,6 +222,46 @@ def answer_question_chat(
 @app.route("/")
 def hello_world():
     return "Hello, World!"
+
+
+@app.route("/logo.png", methods=["GET"])
+def plugin_logo():
+    return send_from_directory(os.path.dirname(__file__), "img/logo.png")
+
+
+@app.route("/.well-known/ai-plugin.json", methods=["GET"])
+def plugin_manifest():
+    return send_from_directory(os.path.dirname(__file__), "ai-plugin.json")
+
+
+@app.route("/openapi.yaml", methods=["GET"])
+def openapi_spec():
+    return send_from_directory(os.path.dirname(__file__), "openapi.yaml")
+
+
+@app.route("/query", methods=["POST"])
+def openapi_query():
+    responseBody = {"results": ""}
+    try:
+        body = request.get_json()
+        print(body)
+        print(body["query"])
+        question = body["query"]
+        max_len = 4000
+        print("question==>", question)
+        print("max_len==>", max_len)
+        df = df_ko
+        context, _, _ = create_context(
+            question, df, max_len=max_len, skip_cnt=0, debug=False
+        )
+        print("context==>", context)
+
+        responseBody["results"] = context
+
+    except Exception as e:
+        print(e)
+        responseBody["results"] = "에러가 발생했습니다."
+    return responseBody
 
 
 @app.route("/api/sayHello", methods=["POST"])

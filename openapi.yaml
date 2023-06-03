@@ -1,0 +1,44 @@
+openapi: 3.0.2
+info:
+  title: WebSquare plugin
+  description: A retrieval API for querying and filtering WebSquare documents based on natural language queries and metadata.
+  version: 1.0.0
+servers:
+  - url: https://41ec6e2ada58.ngrok.app
+paths:
+  /query:
+    post:
+      summary: Query
+      description: Accept a query string using a chat message. Forward the entire chat message unmodified.
+      operationId: query_query_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QueryRequest"
+        required: true
+      responses:
+        "200":
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueryResponse"
+components:
+  schemas:
+    QueryRequest:
+      required:
+        - query
+      type: object
+      properties:
+        query:
+          type: string
+          description: query string
+          required: true
+    QueryResponse:
+      type: object
+      properties:
+        results:
+          type: string
+          description: related content
+          required: true
